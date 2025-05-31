@@ -26,7 +26,7 @@ echo "Enabling custom 'fro-auth' plugin..."
 tutor plugins enable fro-auth
 
 echo "Building MFE image..."
-tutor images build mfe
+tutor images build mfe --no-cache
 
 echo "Launching Open edX platform locally..."
 tutor local launch --non-interactive
