@@ -33,16 +33,17 @@ jobs:
           sudo usermod -aG docker $USER
           sudo systemctl enable docker
           sudo systemctl start docker
-          sudo systemctl status docker
 
           echo "Cleaning Docker system to free space..."
           sudo docker builder prune -af
           sudo docker system prune -af --volumes
 
-          # Apply group changes for current session
-          newgrp docker << 'DOCKER_COMMANDS'
-          bash install_tutor.sh
-          bash lms.sh
-          DOCKER_COMMANDS
-          
+          echo "Re-entering shell to apply new docker group permissions..."
+
+          su - $USER -c '
+            set -e
+            cd ~/install_scripts
+            bash install_tutor.sh
+            bash lms.sh
+          '
           EOF
