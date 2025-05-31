@@ -23,13 +23,16 @@ jobs:
           ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
           set -e
 
+          echo "Cloning installation scripts..."
           git clone https://github.com/yashaswi29/install_scripts.git
           cd install_scripts
 
           chmod +x install_docker.sh install_tutor.sh lms.sh
 
+          echo "Running Docker installation..."
           bash install_docker.sh
 
+          echo "Adding user to Docker group and enabling Docker..."
           sudo usermod -aG docker $USER
           sudo systemctl enable docker
           sudo systemctl start docker
@@ -38,9 +41,8 @@ jobs:
           sudo docker builder prune -af
           sudo docker system prune -af --volumes
 
-          echo "Re-entering shell to apply new docker group permissions..."
-
-          su - $USER -c '
+          echo "Running Tutor installation as regular user (docker group applied)..."
+          sudo -u $USER bash -c '
             set -e
             cd ~/install_scripts
             bash install_tutor.sh
