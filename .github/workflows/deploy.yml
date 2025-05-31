@@ -6,6 +6,7 @@ on:
 jobs:
   ssh-and-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -19,34 +20,29 @@ jobs:
 
       - name: Run commands on VM
         run: |
-          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
           set -e
 
-          echo "Cloning scripts repo..."
-          git clone https://github.com/yashaswi29/install_scripts.git || true
+          git clone https://github.com/yashaswi29/install_scripts.git
           cd install_scripts
 
-          echo "Making scripts executable..."
           chmod +x install_docker.sh install_tutor.sh lms.sh
 
-          echo "Installing Docker..."
           bash install_docker.sh
 
-          echo "Adding user to Docker group..."
           sudo usermod -aG docker $USER
           sudo systemctl enable docker
           sudo systemctl start docker
+          sudo systemctl status docker
 
           echo "Cleaning Docker system to free space..."
           sudo docker builder prune -af
           sudo docker system prune -af --volumes
 
-          echo "Available space:"
-          df -h /
-
-          echo "Running Tutor install..."
+          # Apply group changes for current session
+          newgrp docker << 'DOCKER_COMMANDS'
           bash install_tutor.sh
-
-          echo "Launching LMS..."
           bash lms.sh
+          DOCKER_COMMANDS
+          
           EOF
