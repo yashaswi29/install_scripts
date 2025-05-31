@@ -10,11 +10,11 @@ cp /home/$USER/install_scripts/fro-auth.py "$TUTOR_PLUGIN_DIR/"
 
 echo "Running tutor config save..."
 tutor config save \
-  --set LMS_HOST="local.openedx.io" \
-  --set CMS_HOST="studio.local.openedx.io" \
-  --set PLATFORM_NAME="Aavapti Dev Server" \
-  --set CONTACT_EMAIL="$USER@afidigitalservices.com" \
-  --set ENABLE_HTTPS="false"
+  --set LMS_HOST="lms.aavaptitechnologies.com" \
+  --set CMS_HOST="cms.aavaptitechnologies.com" \
+  --set PLATFORM_NAME="Aavapti Technologies" \
+  --set CONTACT_EMAIL="yashaswi@afidigitalservices.com" \
+  --set ENABLE_HTTPS="true"
 
 echo "Listing Tutor plugins..."
 tutor plugins list
