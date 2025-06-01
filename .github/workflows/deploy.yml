@@ -4,48 +4,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  ssh-and-run:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+      - name: First SSH - Docker Installation
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: azureuser
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euxo pipefail
 
-      - name: Run commands on VM
-        run: |
-          ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
-          set -e
+            # Clone repo or pull latest
+            if [ -d install_scripts ]; then
+              cd install_scripts && git pull
+            else
+              git clone https://github.com/yashaswi29/install_scripts.git
+              cd install_scripts
+            fi
 
-          echo "Cloning installation scripts..."
-          git clone https://github.com/yashaswi29/install_scripts.git
-          cd install_scripts
+            chmod +x install_docker.sh
 
-          chmod +x install_docker.sh install_tutor.sh lms.sh
+            echo "Installing Docker..."
+            ./install_docker.sh
 
-          echo "Running Docker installation..."
-          bash install_docker.sh
+            echo "Adding user to docker group and enabling Docker..."
+            sudo usermod -aG docker $(whoami)
+            sudo systemctl enable --now docker
 
-          echo "Adding user to Docker group and enabling Docker..."
-          sudo usermod -aG docker $USER
-          sudo systemctl enable docker
-          sudo systemctl start docker
+            echo "Cleanup Docker cache..."
+            sudo docker builder prune -af
+            sudo docker system prune -af --volumes
 
-          echo "Cleaning Docker system to free space..."
-          sudo docker builder prune -af
-          sudo docker system prune -af --volumes
+      - name: Pause for usermod to take effect (wait ~10s)
+        run: sleep 10
 
-          echo "Running Tutor installation as regular user (docker group applied)..."
-          sudo -u $USER bash -c '
-            set -e
-            cd ~/install_scripts
-            bash install_tutor.sh
-            bash lms.sh
-          '
-          EOF
+      - name: Second SSH - Tutor + LMS Installation
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: azureuser
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euxo pipefail
+
+            cd ~/install_scripts || exit 1
+
+            chmod +x install_tutor.sh lms.sh
+
+            echo "Installing Tutor..."
+            ./install_tutor.sh
+
+            echo "Running LMS setup..."
+            ./lms.sh
