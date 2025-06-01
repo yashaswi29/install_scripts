@@ -21,15 +21,25 @@ jobs:
       - name: Run commands on VM
         run: |
           ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
-          set -e
+          set -euxo pipefail
 
-          git clone https://github.com/yashaswi29/install_scripts.git
-          cd install_scripts
+          # Clone repo or pull latest changes
+          if [ -d "install_scripts" ]; then
+            echo "Repository exists, pulling latest changes..."
+            cd install_scripts
+            git pull
+          else
+            echo "Cloning repository..."
+            git clone https://github.com/yashaswi29/install_scripts.git
+            cd install_scripts
+          fi
 
           chmod +x install_docker.sh install_tutor.sh lms.sh
 
+          echo "Installing Docker..."
           bash install_docker.sh
 
+          echo "Adding user to docker group..."
           sudo usermod -aG docker $USER
           sudo systemctl enable docker
           sudo systemctl start docker
@@ -39,10 +49,23 @@ jobs:
           sudo docker builder prune -af
           sudo docker system prune -af --volumes
 
-          # Apply group changes for current session
-          newgrp docker << 'DOCKER_COMMANDS'
-          bash install_tutor.sh
-          bash lms.sh
-          DOCKER_COMMANDS
+          EOF
+
+      - name: Wait for group changes to take effect
+        run: sleep 15
+
+      - name: Run Tutor and LMS installation
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
+          set -euxo pipefail
           
+          cd install_scripts
+          
+          echo "Installing Tutor..."
+          bash install_tutor.sh
+          
+          echo "Tutor installation completed. Starting LMS setup..."
+          bash lms.sh
+          
+          echo "All installations completed successfully!"
           EOF
