@@ -18,7 +18,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: azureuser
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 120
+          timeout: 120m
           script: |
             set -euxo pipefail
 
