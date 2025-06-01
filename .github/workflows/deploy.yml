@@ -4,64 +4,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  ssh-and-run:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: First SSH - Docker Installation
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: azureuser
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 7200
-          script: |
-            set -euxo pipefail
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-            # Clone repo or pull latest
-            if [ -d install_scripts ]; then
-              cd install_scripts && git pull
-            else
-              git clone https://github.com/yashaswi29/install_scripts.git
-              cd install_scripts
-            fi
+      - name: Run commands on VM
+        run: |
+          ssh azureuser@${{ secrets.VM_HOST }} << 'EOF'
+          set -e
 
-            chmod +x install_docker.sh
+          git clone https://github.com/yashaswi29/install_scripts.git
+          cd install_scripts
 
-            echo "Installing Docker..."
-            ./install_docker.sh
+          chmod +x install_docker.sh install_tutor.sh lms.sh
 
-            echo "Adding user to docker group and enabling Docker..."
-            sudo usermod -aG docker $(whoami)
-            sudo systemctl enable --now docker
+          bash install_docker.sh
 
-            echo "Cleanup Docker cache..."
-            sudo docker builder prune -af
-            sudo docker system prune -af --volumes
+          sudo usermod -aG docker $USER
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo systemctl status docker
 
-      - name: Pause for usermod to take effect (wait ~10s)
-        run: sleep 10
+          echo "Cleaning Docker system to free space..."
+          sudo docker builder prune -af
+          sudo docker system prune -af --volumes
 
-      - name: Second SSH - Tutor + LMS Installation
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: azureuser
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          timeout: 7200
-          script: |
-            set -euxo pipefail
-
-            cd ~/install_scripts || exit 1
-
-            chmod +x install_tutor.sh lms.sh
-
-            echo "Installing Tutor..."
-            ./install_tutor.sh
-
-            echo "Running LMS setup..."
-            ./lms.sh
+          # Apply group changes for current session
+          newgrp docker << 'DOCKER_COMMANDS'
+          bash install_tutor.sh
+          bash lms.sh
+          DOCKER_COMMANDS
+          
+          EOF
