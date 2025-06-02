@@ -38,3 +38,9 @@ cp -r /home/$USER/install_scripts/indigo "$THEMES_DIR/"
 
 echo "Building Open edX platform image with new theme..."
 tutor images build openedx
+
+echo "Restarting Open edX platform with custom theme...""
+tutor local stop
+tutor local start -d
+tutor local restart
+echo "Open edX platform is now running with the custom Indigo theme and fro-auth plugin enabled."
